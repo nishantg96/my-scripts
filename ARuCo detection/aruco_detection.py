@@ -5,12 +5,12 @@ import argparse
 import imutils
 import time
 import cv2
-import sys
+import sys,os
 
 ap = argparse.ArgumentParser()
 
 ap.add_argument("-t", "--type", type=str,
-   default="DICT_4X4_50",
+   default="DICT_4X4_100",
    help="type of ArUCo tag to generate")
 
 ap.add_argument("-b", "--buffer", type=int, default=128,
@@ -54,17 +54,25 @@ arucoParams = cv2.aruco.DetectorParameters_create()
 # initialize the video stream and allow the camera sensor to warm up
 print("[INFO] starting video stream...")
 
-pts = deque(maxlen=args["buffer"])
-
-vs = VideoStream(src=2).start()
-time.sleep(2.0)
+# pts = deque(maxlen=args["buffer"])
+# vs = VideoStream(src=2).start()
+# time.sleep(2.0)
 
 # loop over the frames from the video stream
-while True:
+# while True:
     # grab the frame from the threaded video stream and resize it
-    frame = vs.read()
-    frame = imutils.resize(frame, width=1000)
-    # detect ArUco markers in the input frame
+    
+folder = os.path.normpath("/home/krekik/Documents/my-scripts/camera_save")
+images = os.listdir(folder)
+i = 0
+
+for image in images:
+    original = cv2.imread(os.path.join(folder,image))
+    frame = original.copy()
+    grayImage = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)    
+    (thresh, blackAndWhiteImage) = cv2.threshold(grayImage,50, 255, cv2.THRESH_BINARY)
+    frame = blackAndWhiteImage
+
     (corners, ids, rejected) = cv2.aruco.detectMarkers(frame,arucoDict, parameters=arucoParams)
 
     # verify *at least* one ArUco marker was detected
@@ -85,29 +93,32 @@ while True:
             topLeft = (int(topLeft[0]), int(topLeft[1]))
 
             # draw the bounding box of the ArUCo detection
-            cv2.line(frame, topLeft, topRight, (0, 255, 0), 2)
-            cv2.line(frame, topRight, bottomRight, (0, 255, 0), 2)
-            cv2.line(frame, bottomRight, bottomLeft, (0, 255, 0), 2)
-            cv2.line(frame, bottomLeft, topLeft, (0, 255, 0), 2)
+            cv2.line(original, topLeft, topRight, (0, 255, 0), 2)
+            cv2.line(original, topRight, bottomRight, (0, 255, 0), 2)
+            cv2.line(original, bottomRight, bottomLeft, (0, 255, 0), 2)
+            cv2.line(original, bottomLeft, topLeft, (0, 255, 0), 2)
             # compute and draw the center (x, y)-coordinates of the
             # ArUco marker
             cX = int((topLeft[0] + bottomRight[0]) / 2.0)
             cY = int((topLeft[1] + bottomRight[1]) / 2.0)
             center = (cX,cY)
-            cv2.circle(frame, (cX, cY), 4, (0, 0, 255), -1)
+            cv2.circle(original, (cX, cY), 1, (0, 0, 255), -1)
             # draw the ArUco marker ID on the frame
-            cv2.putText(frame, str(markerID),(topLeft[0], topLeft[1] - 15),	cv2.FONT_HERSHEY_SIMPLEX,0.5, (0, 255, 0), 2)
+            out = f"ID: {str(markerID)} , X:{str(cX)},  Y:{str(cY)}"
+            position = (10,50)
+            cv2.putText(original, out ,position,	cv2.FONT_HERSHEY_SIMPLEX,1, (0, 255, 0), 2)
 
-            pts.appendleft(center)
-            for i in np.arange(1, len(pts)):
-                if pts[i - 1] is None or pts[i] is None:
-                    continue
+            # pts.appendleft(center)
+            # for i in np.arange(1, len(pts)):
+            #     if pts[i - 1] is None or pts[i] is None:
+            #         continue
 
-                thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
-                cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
-    # show the output frame
-
-    frame = cv2.flip(frame, 1)
+            #     thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
+            #     cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
+        # show the output frame
+    else:
+        cv2.putText(original, "Marker not found!" ,(10,50),	cv2.FONT_HERSHEY_SIMPLEX,1, (0, 255, 0), 2)
+    # frame = cv2.flip(frame, 1)
     screen_res = 1920, 720
     scale_width = screen_res[0] / frame.shape[1]
     scale_height = screen_res[1] / frame.shape[0]
@@ -118,11 +129,10 @@ while True:
     cv2.namedWindow('Resized Window', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Resized Window', window_width, window_height)
 
-    cv2.imshow('Resized Window', frame)
-    key = cv2.waitKey(1) & 0xFF
-    # if the `q` key was pressed, break from the loop
-    if key == ord("q"):
-        break
-# do a bit of cleanup
-cv2.destroyAllWindows()
-vs.stop()
+    # cv2.imshow('Resized Window', original)
+    # key = cv2.waitKey(0)
+    # # if the `q` key was pressed, break from the loop
+    # # do a bit of cleanup
+    # cv2.destroyAllWindows()
+    cv2.imwrite(f"out_{image}",original)
+    # vs.stop()
